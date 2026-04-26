@@ -92,7 +92,7 @@ You are applying the condition to **ALL resources involved**.
 
 But:
 
-*   Network interfaces do NOT have aws:RequestTag/Owner
+*   Network interfaces do NOT have `aws:RequestTag/Owner`
     
 *   So the condition fails
     
@@ -370,7 +370,7 @@ aws ec2 run-instances \
 **🧠 Exam Takeaway**
 ====================
 
-*   EC2 RunInstances evaluates **multiple resources**
+*   `EC2 RunInstances` evaluates **multiple resources**
     
 *   Using "Resource": "\*" can break policies
     
