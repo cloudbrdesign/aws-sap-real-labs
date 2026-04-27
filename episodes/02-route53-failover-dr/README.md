@@ -741,7 +741,6 @@ Route 53 supports active-passive failover using primary and secondary records, w
 export PRIMARY_HEALTH_CHECK_ID=$(aws route53 create-health-check \
   --caller-reference "${PROJECT_NAME}-primary-broken-$(date +%s)" \
   --health-check-config "{
-    \"IPAddress\": null,
     \"Port\": 80,
     \"Type\": \"HTTP\",
     \"ResourcePath\": \"/broken-health\",
