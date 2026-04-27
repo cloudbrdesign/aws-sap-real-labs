@@ -755,3 +755,257 @@ export PRIMARY_HEALTH_CHECK_ID=$(aws route53 create-health-check \
 echo $PRIMARY_HEALTH_CHECK_ID
 ```
 
+**Step 16 — Create Route 53 Failover Records**
+=======================================================
+
+We will create two records with the same name:
+
+```text
+app.clusterforge.net
+```
+
+One is the **PRIMARY** failover record pointing to the us-west-1 ALB.
+
+The other is the **SECONDARY** failover record pointing to the us-east-1 ALB.
+
+### **Create Change Batch**
+
+```bash
+cat > route53-failover-records.json <<EOF
+{
+  "Comment": "Create failover records for Episode 2 DR lab",
+  "Changes": [
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "$RECORD_NAME",
+        "Type": "A",
+        "SetIdentifier": "primary-us-west-1",
+        "Failover": "PRIMARY",
+        "HealthCheckId": "$PRIMARY_HEALTH_CHECK_ID",
+        "AliasTarget": {
+          "HostedZoneId": "$PRIMARY_ALB_ZONE_ID",
+          "DNSName": "$PRIMARY_ALB_DNS",
+          "EvaluateTargetHealth": true
+        }
+      }
+    },
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "$RECORD_NAME",
+        "Type": "A",
+        "SetIdentifier": "secondary-us-east-1",
+        "Failover": "SECONDARY",
+        "AliasTarget": {
+          "HostedZoneId": "$SECONDARY_ALB_ZONE_ID",
+          "DNSName": "$SECONDARY_ALB_DNS",
+          "EvaluateTargetHealth": true
+        }
+      }
+    }
+  ]
+}
+EOF
+```
+
+Apply:
+
+```bash
+aws route53 change-resource-record-sets \
+  --hosted-zone-id $HOSTED_ZONE_ID \
+  --change-batch file://route53-failover-records.json
+```
+
+**Step 17 — Validate the Intentional Failure**
+=======================================================
+
+Wait a few minutes for the Route 53 health check to become unhealthy.
+
+```bash
+aws route53 get-health-check-status \
+  --health-check-id $PRIMARY_HEALTH_CHECK_ID
+```
+
+Expected:
+```text
+Failure
+```
+
+Now test the domain:
+```bash
+curl http://$RECORD_NAME
+```
+
+Expected result:
+
+```text
+SECONDARY REGION
+us-east-1
+```
+
+This proves Route 53 is treating the primary endpoint as unhealthy and failing over to the secondary region.
+
+**Step 18 — Fix the Health Check**
+=======================================================
+
+Delete the broken health check after replacing it with a correct one.
+
+Create a correct health check using /:
+
+```bash
+export FIXED_PRIMARY_HEALTH_CHECK_ID=$(aws route53 create-health-check \
+  --caller-reference "${PROJECT_NAME}-primary-fixed-$(date +%s)" \
+  --health-check-config "{
+    \"IPAddress\": null,
+    \"Port\": 80,
+    \"Type\": \"HTTP\",
+    \"ResourcePath\": \"/\",
+    \"FullyQualifiedDomainName\": \"$PRIMARY_ALB_DNS\",
+    \"RequestInterval\": 30,
+    \"FailureThreshold\": 3
+  }" \
+  --query "HealthCheck.Id" \
+  --output text)
+
+echo $FIXED_PRIMARY_HEALTH_CHECK_ID
+```
+
+Update Route 53 record to use the fixed health check:
+
+```bash
+cat > route53-fixed-records.json <<EOF
+{
+  "Comment": "Fix primary health check for Episode 2 DR lab",
+  "Changes": [
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "$RECORD_NAME",
+        "Type": "A",
+        "SetIdentifier": "primary-us-west-1",
+        "Failover": "PRIMARY",
+        "HealthCheckId": "$FIXED_PRIMARY_HEALTH_CHECK_ID",
+        "AliasTarget": {
+          "HostedZoneId": "$PRIMARY_ALB_ZONE_ID",
+          "DNSName": "$PRIMARY_ALB_DNS",
+          "EvaluateTargetHealth": true
+        }
+      }
+    },
+    {
+      "Action": "UPSERT",
+      "ResourceRecordSet": {
+        "Name": "$RECORD_NAME",
+        "Type": "A",
+        "SetIdentifier": "secondary-us-east-1",
+        "Failover": "SECONDARY",
+        "AliasTarget": {
+          "HostedZoneId": "$SECONDARY_ALB_ZONE_ID",
+          "DNSName": "$SECONDARY_ALB_DNS",
+          "EvaluateTargetHealth": true
+        }
+      }
+    }
+  ]
+}
+EOF
+```
+Apply:
+
+```bash
+aws route53 change-resource-record-sets \
+  --hosted-zone-id $HOSTED_ZONE_ID \
+  --change-batch file://route53-fixed-records.json
+```
+
+Wait a few minutes, then test:
+
+```bash
+aws route53 get-health-check-status \
+  --health-check-id $FIXED_PRIMARY_HEALTH_CHECK_ID
+```
+
+Then:
+
+```bash
+curl http://$RECORD_NAME
+```
+
+Expected:
+
+```text
+PRIMARY REGION
+us-west-1
+```
+
+**Debug Explanation**
+---------------------
+
+The failure was not that the ALB was broken.
+
+The failure was that Route 53 was using a health check that did not represent the real application health.
+
+That is a common disaster recovery mistake:
+
+```text
+The infrastructure exists.
+The backup exists.
+But failover logic is wrong.
+```
+
+In this lab:
+
+```text
+Primary ALB direct test:
+Works
+
+Primary Route 53 health check:
+Fails
+
+Route 53 result:
+Send traffic to secondary
+```
+
+That is exactly the distinction AWS SAP expects you to understand.
+
+**Exam Takeaway**
+-----------------
+
+This scenario tests the difference between:
+
+```text
+Multi-AZ high availability
+```
+and:
+
+```text
+Multi-Region disaster recovery
+```
+
+The correct architecture pattern is:
+
+```text
+ALB + Auto Scaling Group across multiple AZs in the primary region
+ALB + Auto Scaling Group across multiple AZs in the secondary region
+Route 53 failover routing policy
+Health check on the primary endpoint
+Secondary record for passive failover
+```
+
+Common traps:
+
+```text
+Thinking ALB alone gives multi-region DR
+Thinking Auto Scaling alone solves regional failure
+Forgetting Route 53 health checks
+Using active-active routing when the requirement says passive backup
+Assuming DNS failover is instant
+```
+
+Final lesson:
+
+```text
+High availability keeps the app running inside a region.
+Disaster recovery keeps the app reachable when a region fails.
+```
