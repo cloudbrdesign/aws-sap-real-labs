@@ -856,7 +856,6 @@ Create a correct health check using /:
 export FIXED_PRIMARY_HEALTH_CHECK_ID=$(aws route53 create-health-check \
   --caller-reference "${PROJECT_NAME}-primary-fixed-$(date +%s)" \
   --health-check-config "{
-    \"IPAddress\": null,
     \"Port\": 80,
     \"Type\": \"HTTP\",
     \"ResourcePath\": \"/\",
