@@ -1009,3 +1009,181 @@ Final lesson:
 High availability keeps the app running inside a region.
 Disaster recovery keeps the app reachable when a region fails.
 ```
+
+**🧹 Cleanup**
+==============
+
+⚠️ This lab creates billable resources (ALBs, EC2, ASG, Route 53 health checks).Run the cleanup immediately after testing.
+
+**Step 1 — Delete Route 53 Records**
+------------------------------------
+
+First remove the failover records:
+
+```bash
+aws route53 change-resource-record-sets \
+  --hosted-zone-id $HOSTED_ZONE_ID \
+  --change-batch file://route53-delete-records.json
+```
+
+### **Create delete batch file**
+
+```bash
+cat > route53-delete-records.json <<EOF
+{
+  "Comment": "Delete failover records",
+  "Changes": [
+    {
+      "Action": "DELETE",
+      "ResourceRecordSet": {
+        "Name": "$RECORD_NAME",
+        "Type": "A",
+        "SetIdentifier": "primary-us-west-1",
+        "Failover": "PRIMARY",
+        "HealthCheckId": "$FIXED_PRIMARY_HEALTH_CHECK_ID",
+        "AliasTarget": {
+          "HostedZoneId": "$PRIMARY_ALB_ZONE_ID",
+          "DNSName": "$PRIMARY_ALB_DNS",
+          "EvaluateTargetHealth": true
+        }
+      }
+    },
+    {
+      "Action": "DELETE",
+      "ResourceRecordSet": {
+        "Name": "$RECORD_NAME",
+        "Type": "A",
+        "SetIdentifier": "secondary-us-east-1",
+        "Failover": "SECONDARY",
+        "AliasTarget": {
+          "HostedZoneId": "$SECONDARY_ALB_ZONE_ID",
+          "DNSName": "$SECONDARY_ALB_DNS",
+          "EvaluateTargetHealth": true
+        }
+      }
+    }
+  ]
+}
+EOF
+```
+
+**Step 2 — Delete Route 53 Health Checks**
+------------------------------------------
+
+```bash
+aws route53 delete-health-check \
+  --health-check-id $PRIMARY_HEALTH_CHECK_ID
+
+aws route53 delete-health-check \
+  --health-check-id $FIXED_PRIMARY_HEALTH_CHECK_ID
+```
+
+**Step 3 — Delete Auto Scaling Groups**
+---------------------------------------
+
+```bash
+aws autoscaling delete-auto-scaling-group \
+  --region $PRIMARY_REGION \
+  --auto-scaling-group-name "${PROJECT_NAME}-primary-asg" \
+  --force-delete
+
+aws autoscaling delete-auto-scaling-group \
+  --region $SECONDARY_REGION \
+  --auto-scaling-group-name "${PROJECT_NAME}-secondary-asg" \
+  --force-delete
+```
+
+**Step 4 — Delete Launch Templates**
+------------------------------------
+
+```bash
+aws ec2 delete-launch-template \
+  --region $PRIMARY_REGION \
+  --launch-template-name "${PROJECT_NAME}-primary-lt"
+
+aws ec2 delete-launch-template \
+  --region $SECONDARY_REGION \
+  --launch-template-name "${PROJECT_NAME}-secondary-lt"
+```
+
+**Step 5 — Delete ALB Listeners**
+---------------------------------
+
+```bash
+aws elbv2 describe-listeners \
+  --region $PRIMARY_REGION \
+  --load-balancer-arn $PRIMARY_ALB_ARN \
+  --query "Listeners[].ListenerArn" \
+  --output text | xargs -n1 -I {} aws elbv2 delete-listener --region $PRIMARY_REGION --listener-arn {}
+
+aws elbv2 describe-listeners \
+  --region $SECONDARY_REGION \
+  --load-balancer-arn $SECONDARY_ALB_ARN \
+  --query "Listeners[].ListenerArn" \
+  --output text | xargs -n1 -I {} aws elbv2 delete-listener --region $SECONDARY_REGION --listener-arn {}
+```
+
+**Step 6 — Delete Application Load Balancers**
+----------------------------------------------
+
+```bash
+aws elbv2 delete-load-balancer \
+  --region $PRIMARY_REGION \
+  --load-balancer-arn $PRIMARY_ALB_ARN
+
+aws elbv2 delete-load-balancer \
+  --region $SECONDARY_REGION \
+  --load-balancer-arn $SECONDARY_ALB_ARN
+```
+
+Wait ~1–2 minutes before continuing.
+
+**Step 7 — Delete Target Groups**
+---------------------------------
+
+```bash
+aws elbv2 delete-target-group \
+  --region $PRIMARY_REGION \
+  --target-group-arn $PRIMARY_TG_ARN
+
+aws elbv2 delete-target-group \
+  --region $SECONDARY_REGION \
+  --target-group-arn $SECONDARY_TG_ARN
+```
+
+**Step 8 — Delete Security Groups**
+-----------------------------------
+
+```bash
+aws ec2 delete-security-group \
+  --region $PRIMARY_REGION \
+  --group-id $PRIMARY_ALB_SG_ID
+
+aws ec2 delete-security-group \
+  --region $PRIMARY_REGION \
+  --group-id $PRIMARY_EC2_SG_ID
+
+aws ec2 delete-security-group \
+  --region $SECONDARY_REGION \
+  --group-id $SECONDARY_ALB_SG_ID
+
+aws ec2 delete-security-group \
+  --region $SECONDARY_REGION \
+  --group-id $SECONDARY_EC2_SG_ID
+```
+
+**✅ Final Check**
+=================
+
+Run:
+
+```bash
+aws elbv2 describe-load-balancers --region $PRIMARY_REGION
+aws elbv2 describe-load-balancers --region $SECONDARY_REGION
+```
+
+You should see:
+
+```text
+(empty)
+```
