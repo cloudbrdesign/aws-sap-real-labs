@@ -31,9 +31,19 @@ Concepts:
 
 ---
 
-### 02 — (Coming Next)
+### 02 — Route 53 Failover & Disaster Recovery
 
-EventBridge + GuardDuty automation
+👉 [How Route 53 Fails Over Between Regions (Real DR Lab)](episodes/02-route53-failover-dr)
+
+Concepts:
+
+- Route 53 failover routing (active-passive)
+- DNS health checks and failover behavior
+- Application Load Balancer (ALB) multi-AZ behavior
+- Auto Scaling Groups with target groups
+- Multi-region disaster recovery (DR) patterns
+- Why DNS failover depends on health check configuration
+
 
 ---
 
