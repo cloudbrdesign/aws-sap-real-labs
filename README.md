@@ -46,6 +46,24 @@ Concepts:
 
 
 ---
+## **03 — Confused Deputy & External ID**
+
+# 
+
+👉 [Why Your IAM Role Trust Fails (Confused Deputy Explained)](episodes/03-confused-deputy-external-id)
+
+### **Concepts:**
+
+# 
+
+-   Confused deputy problem (AWS context)
+-   IAM trust policies vs permission policies
+-   `sts:AssumeRole` behavior
+-   `sts:ExternalId` condition key
+-   Cross-account access security patterns
+-   Why identity ≠ context in AWS authorization
+-   Least privilege for third-party access
+-   How AWS evaluates AssumeRole requests internally
 
 ## 🚀 How to Use This Repository
 
