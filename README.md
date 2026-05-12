@@ -65,6 +65,40 @@ Concepts:
 -   Least privilege for third-party access
 -   How AWS evaluates AssumeRole requests internally
 
+### 04 — Hybrid AWS Networking & Enterprise Connectivity
+
+👉 [AWS SAP: Direct Connect vs VPN vs Transit Gateway (Enterprise Networking Deep Dive)](episodes/04-hybrid-aws-networking-and-enterprise-connectivity)
+
+Concepts:
+
+*   Site-to-Site VPN vs Direct Connect
+    
+*   Public VIF vs Private VIF vs Transit VIF
+    
+*   Transit Gateway (TGW) hub-and-spoke networking
+    
+*   Direct Connect Gateway (DXGW) global connectivity
+    
+*   Overlay vs underlay networking
+    
+*   BGP routing and route propagation
+    
+*   Hybrid cloud architecture patterns
+    
+*   Transit Gateway vs VPC Peering
+    
+*   Private transport vs encrypted transport
+    
+*   Multi-region hybrid networking design
+    
+*   Customer gateway vs customer router roles
+    
+*   Why Direct Connect is private but not encrypted
+    
+*   How enterprise AWS WAN architectures scale
+
+---
+
 ## 🚀 How to Use This Repository
 
 1. Pick an episode
