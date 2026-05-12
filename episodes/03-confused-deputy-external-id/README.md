@@ -248,8 +248,8 @@ echo $ACCOUNT_ID
 ```
 Create useful ARNs:
 ```bash
-export LAB_USER_ARN="arn:aws:iam::$ACCOUNT_ID:user/$LAB_USER"
-export ROLE_ARN="arn:aws:iam::$ACCOUNT_ID:role/$ROLE_NAME"
+export LAB_USER_ARN="arn:aws:iam::${ACCOUNT_ID}:user/${LAB_USER}"
+export ROLE_ARN="arn:aws:iam::${ACCOUNT_ID}:role/${ROLE_NAME}"
 
 echo $LAB_USER_ARN
 echo $ROLE_ARN
